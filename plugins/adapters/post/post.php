@@ -192,9 +192,32 @@ class WPPipesAdapter_post {
 		return $res;
 	}
 
+	public static function get_image_content($url){
+		$options = array(
+			CURLOPT_RETURNTRANSFER => true, // return web page
+			CURLOPT_HEADER         => false, // don't return headers
+			CURLOPT_FOLLOWLOCATION => true, // follow redirects
+			CURLOPT_ENCODING       => "utf-8", // handle all encodings
+			CURLOPT_USERAGENT      => "spider", // who am i
+			CURLOPT_AUTOREFERER    => true, // set referer on redirect
+			CURLOPT_CONNECTTIMEOUT => 120, // timeout on connect
+			CURLOPT_TIMEOUT        => 120, // timeout on response
+			CURLOPT_MAXREDIRS      => 10, // stop after 10 redirects
+			CURLOPT_URL => $url
+		);
+
+		$ch = curl_init();
+		curl_setopt_array( $ch, $options );
+		$file_contents = curl_exec($ch);
+		curl_close($ch);
+
+		return $file_contents;
+	}
+
 	public static function set_feature_image( $image_url, $post_id ) {
 		$upload_dir = wp_upload_dir(); // Set upload folder
-		$image_data = @file_get_contents( $image_url, true ); // Get image data
+		//$image_data = @file_get_contents( $image_url, true ); // Get image data
+		$image_data =  self::get_image_content($image_url);
 
 		$filename = basename( $image_url ); // Create image file name
 		if ( wp_mkdir_p( $upload_dir['path'] ) ) {

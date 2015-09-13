@@ -233,7 +233,20 @@ class WPPipesPro_image {
 				$source_urls[$i] = self::img_url_encode( $source_urls[$i] );
 			}
 
+			$stream_context_defaults = stream_context_get_options(stream_context_get_default());
+			stream_context_set_default(
+				array(
+					'http' => array(
+						'method' => 'HEAD',
+						'header' => "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_4) AppleWebKit/537.1 (KHTML, like Gecko) Chrome/21.0.1180.79 Safari/537.1\r\n"
+					)
+				)
+			);
+
 			$info_file = @get_headers( trim( $source_urls[$i] ), 1 );
+
+			stream_context_set_default($stream_context_defaults); // reset to defaults
+
 			if ( ! $info_file ) {
 				$curl                      = self::get_web_page( trim( $source_urls[$i] ) );
 				$info_file['Content-Type'] = $curl['content_type'];
@@ -290,7 +303,8 @@ class WPPipesPro_image {
 					$aa = ogbFolder::create( $dest_path );
 					if ( $aa ) {
 
-						$img_c = ogbFile::get_curl( trim( $s ) );
+						//$img_c = ogbFile::get_curl( trim( $s ) );
+						$img_c = self::get_image_content( trim( $s ) );
 
 						$a = ogbFile::write( $d, $img_c );
 
@@ -298,7 +312,12 @@ class WPPipesPro_image {
 						if ( is_file( $d ) ) {
 							$size = filesize( $d );
 							if ( $size > 0 ) {
-								$img_info = getimagesize( trim( $source_urls[$i] ) );
+								$img_info = @getimagesize( trim( $source_urls[$i] ) );
+
+								if(!$img_info){
+									$img_info = self::get_image_size_from_url( trim( $source_urls[$i] ) );
+								}
+
 								$width    = isset( $img_info[0] ) ? $img_info[0] : 0;
 								$height   = isset( $img_info[1] ) ? $img_info[1] : 0;
 
@@ -386,6 +405,59 @@ class WPPipesPro_image {
 		$result = str_replace( "%3A//", "://", $result );
 
 		return $result;
+	}
+
+	public static function get_image_content($url){
+		$options = array(
+			CURLOPT_RETURNTRANSFER => true, // return web page
+			CURLOPT_HEADER         => false, // don't return headers
+			CURLOPT_FOLLOWLOCATION => true, // follow redirects
+			CURLOPT_ENCODING       => "utf-8", // handle all encodings
+			CURLOPT_USERAGENT      => "spider", // who am i
+			CURLOPT_AUTOREFERER    => true, // set referer on redirect
+			CURLOPT_CONNECTTIMEOUT => 120, // timeout on connect
+			CURLOPT_TIMEOUT        => 120, // timeout on response
+			CURLOPT_MAXREDIRS      => 10, // stop after 10 redirects
+			CURLOPT_URL => $url
+		);
+
+		$ch = curl_init();
+		curl_setopt_array( $ch, $options );
+		$file_contents = curl_exec($ch);
+		curl_close($ch);
+
+		return $file_contents;
+	}
+
+	public static function get_image_size_from_url($url){
+
+		$options = array(
+			CURLOPT_RETURNTRANSFER => true, // return web page
+			CURLOPT_HEADER         => false, // don't return headers
+			CURLOPT_FOLLOWLOCATION => true, // follow redirects
+			CURLOPT_ENCODING       => "utf-8", // handle all encodings
+			CURLOPT_USERAGENT      => "spider", // who am i
+			CURLOPT_AUTOREFERER    => true, // set referer on redirect
+			CURLOPT_CONNECTTIMEOUT => 120, // timeout on connect
+			CURLOPT_TIMEOUT        => 120, // timeout on response
+			CURLOPT_MAXREDIRS      => 10, // stop after 10 redirects
+			CURLOPT_URL => $url
+		);
+
+		$ch = curl_init();
+		curl_setopt_array( $ch, $options );
+		$file_contents = curl_exec($ch);
+		curl_close($ch);
+
+		$new_image = ImageCreateFromString($file_contents);
+		imagejpeg($new_image, "temp.jpg",100);
+
+		// Get new dimensions
+		$myfilesize = getimagesize("temp.jpg");
+		$width_orig = $myfilesize[0];
+		$height_orig = $myfilesize[1];
+
+		return array($width_orig, $height_orig);
 	}
 
 	public static function get_web_page( $url ) {
